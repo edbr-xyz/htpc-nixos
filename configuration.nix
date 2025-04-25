@@ -2,64 +2,69 @@
 # your system.  Help is available in the configuration.nix(5) man page
 # and in the NixOS manual (accessible by running ‘nixos-help’).
 
-{ config, pkgs, lib, ... }:
-
+{ config, lib, pkgs, ... }:
+  
   ## Firefox config variables
   let
     lock-false = { Value = false; Status = "locked"; };
     lock-true = { Value = true; Status = "locked"; };
+
+    unstable = import <nixos-unstable> { config = { allowUnfree = true; }; };
   in
 {
-  imports = [ 
-    ./hardware-configuration.nix # Include the results of the hardware scan.
-  ];
+  boot.kernelPackages = pkgs.linuxPackages_6_14;
+
+  imports =
+    [ # Include the results of the hardware scan.
+      ./hardware-configuration.nix
+    ];
 
   # Bootloader.
-  boot.loader.systemd-boot.enable = true;
-  boot.loader.efi.canTouchEfiVariables = true;
+  boot.loader = {
+    systemd-boot.enable = true;
+    efi.canTouchEfiVariables = true;
+  };
 
-  networking.hostName = "edbr-htpc"; # Define your hostname.
-  # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
-
-  # Enable networking
-  networking.networkmanager.enable = true;
+  networking = {
+    networkmanager.enable = true; # Enable networking
+    hostName = "edbr-n150"; # Define your hostname.
+  };
 
   # Set your time zone.
   time.timeZone = "Europe/London";
 
   # Select internationalisation properties.
-  i18n.defaultLocale = "en_GB.UTF-8";
-
-  i18n.extraLocaleSettings = {
-    LC_ADDRESS = "en_GB.UTF-8";
-    LC_IDENTIFICATION = "en_GB.UTF-8";
-    LC_MEASUREMENT = "en_GB.UTF-8";
-    LC_MONETARY = "en_GB.UTF-8";
-    LC_NAME = "en_GB.UTF-8";
-    LC_NUMERIC = "en_GB.UTF-8";
-    LC_PAPER = "en_GB.UTF-8";
-    LC_TELEPHONE = "en_GB.UTF-8";
-    LC_TIME = "en_GB.UTF-8";
+  i18n = {
+    defaultLocale = "en_GB.UTF-8";
+    extraLocaleSettings = {
+      LC_ADDRESS = "en_GB.UTF-8";
+      LC_IDENTIFICATION = "en_GB.UTF-8";
+      LC_MEASUREMENT = "en_GB.UTF-8";
+      LC_MONETARY = "en_GB.UTF-8";
+      LC_NAME = "en_GB.UTF-8";
+      LC_NUMERIC = "en_GB.UTF-8";
+      LC_PAPER = "en_GB.UTF-8";
+      LC_TELEPHONE = "en_GB.UTF-8";
+      LC_TIME = "en_GB.UTF-8";
+    };
   };
 
-  ## Enable nix-ld
-  programs.nix-ld.enable = true;
+  # Enable the X11 windowing system
+  services.xserver.enable = true;
+  services.xserver.displayManager.gdm.enable = true;
+  services.xserver.desktopManager.gnome.enable = true;
 
   ## Enable SSH
   services.openssh.enable = true;
 
   ## Enable Docker
-  virtualisation.docker.enable = true;
-  virtualisation.docker.rootless = {
+  virtualisation.docker = {
     enable = true;
-    setSocketVariable = true;
+    rootless = {
+      enable = true;
+      setSocketVariable = true;
+    };
   };
-  
-  programs.sway.enable = true;
-
-  # Enable the GNOME Desktop Environment.
-  services.xserver.displayManager.gdm.enable = true;
-  services.xserver.desktopManager.gnome.enable = true;
 
   ## Remove GNOME bloat
   environment.gnome.excludePackages = with pkgs; [ 
@@ -75,7 +80,6 @@
     file-roller # archive manager
     geary       # email client
     seahorse    # password manager
-    
     gnome-tour 
     gnome-calendar
     gnome-characters
@@ -85,16 +89,24 @@
     gnome-maps
     gnome-music
     gnome-photos
-    gnome-screenshot
     gnome-weather
-    pkgs.gnome-connections
+    gnome-connections
   ];
+
+  # Configure keymap in X11
+  services.xserver.xkb = {
+    layout = "gb";
+    variant = "";
+  };
+
+  # Configure console keymap
+  console.keyMap = "uk";
 
   ## Enable DConf
   programs.dconf.enable = true;
 
-  # Configure console keymap
-  console.keyMap = "uk";
+  # Enable CUPS to print documents.
+  # services.printing.enable = true;
 
   # Enable sound with pipewire.
   hardware.pulseaudio.enable = false;
@@ -105,38 +117,75 @@
     alsa.support32Bit = true;
     pulse.enable = true;
     # If you want to use JACK applications, uncomment this
-    #jack.enable = true;
+    jack.enable = true;
 
     # use the example session manager (no others are packaged yet so this is enabled by default,
     # no need to redefine it in your config for now)
     #media-session.enable = true;
   };
 
+  # Enable touchpad support (enabled default in most desktopManager).
+  # services.xserver.libinput.enable = true;
+
   # Define a user account. Don't forget to set a password with ‘passwd’.
   users.users.edbr = {
     isNormalUser = true;
     description = "edbr";
-    extraGroups = [ "networkmanager" "wheel" "docker"];
+    extraGroups = [ "networkmanager" "wheel" "docker" ];
+    packages = with pkgs; [
+      spotify
+      moonlight-qt
+      vlc
+      gnome-tweaks
+      vscode
+      gparted
+    ];
   };
 
-  # Allow unfree packages
-  nixpkgs.config.allowUnfree = true;
+  nixpkgs.config.packageOverrides = pkgs: {
+    intel-vaapi-driver = pkgs.intel-vaapi-driver.override { enableHybridCodec = true; };
+  };
+  hardware.graphics = { # hardware.graphics since NixOS 24.11
+    enable = true;
+    extraPackages = with pkgs; [
+      unstable.intel-media-driver # LIBVA_DRIVER_NAME=iHD
+      unstable.intel-vaapi-driver # LIBVA_DRIVER_NAME=i965 (older but works better for Firefox/Chromium)pu-rt
+    ];
+  };
 
-  # List packages installed in system profile. To search, run 'nix search <app>'
-  environment.systemPackages = with pkgs; [
-    spotify
-    moonlight-qt
-    vscode
-    vlc
-    gnome-tweaks
-    docker-compose
-    nh
-    nvtopPackages.amd
-    git
-  ];
+  environment.sessionVariables = { 
+    LIBVA_DRIVER_NAME = "iHD";
+    MESA_LOADER_DRIVER_OVERRIDE = "iHD";
+    MOZ_ENABLE_WAYLAND = "1";
+  };
 
-  environment.sessionVariables.MOZ_ENABLE_WAYLAND = "1";
+  users.defaultUserShell = pkgs.zsh;
+  system.userActivationScripts.zshrc = "touch .zshrc";
+  environment.shells = with pkgs; [ zsh ];
 
+  programs.zsh = {
+    enable = true;
+   
+    enableCompletion = true;
+    enableBashCompletion = true;    
+    autosuggestions.enable = true;
+    syntaxHighlighting.enable = true;
+
+    histSize = 10000;
+
+    shellAliases = {
+      update = "sudo nixos-rebuild switch";
+    };
+
+    setOptions = [ "AUTO_CD" ];
+
+    ohMyZsh = {
+      enable = true;
+      plugins = [ "git" "docker" ];
+      theme = "mh";
+    };
+  };
+  
   programs.firefox = {
     enable = true;
 
@@ -164,7 +213,7 @@
 
       /* ---- PREFERENCES ---- */
       # Check about:config for options.
-      Preferences = { 
+      Preferences = {
         "extensions.pocket.enabled" = lock-false;
         "browser.topsites.contile.enabled" = lock-false;
         "browser.newtabpage.activity-stream.feeds.section.topstories" = lock-false;
@@ -179,8 +228,11 @@
         
         "gfx.webrender.all" = lock-true;
         "media.ffmpeg.vaapi.enabled" = lock-true;
-        "media.av1.enabled" = lock-false;
         "media.videocontrols.picture-in-picture.video-toggle.enabled" = lock-false;
+        "layout.frame_rate" = 1; # vsync issue
+        "gfx.webrender.compositor" = lock-true;
+        "gfx.webrender.compositor.force-enabled" = lock-true;
+        "browser.aboutConfig.showWarning" = lock-false;
       };
     };
   };
@@ -220,19 +272,19 @@
 
         # Restore previous value for AC suspend timeout if script was interrupted.
         if [ -f ~/.config/audiocaffeine/acsuspend ]; then
-            echo "Restoring previous AC suspend timeout."
+            # echo "Restoring previous AC suspend timeout."
             read acsuspendtime < ~/.config/audiocaffeine/acsuspend
             dconf write $actimeoutid $acsuspendtime
-            echo "Removing temporary file ~/.config/audiocaffeine/acsuspend"
+            # echo "Removing temporary file ~/.config/audiocaffeine/acsuspend"
             rm ~/.config/audiocaffeine/acsuspend
         fi
 
         # Restore previous value for battery suspend timeout if script was interrupted.
         if [ -f ~/.config/audiocaffeine/battsuspend ]; then
-            echo "Restoring previous battery suspend timeout."
+            # echo "Restoring previous battery suspend timeout."
             read battsuspendtime < ~/.config/audiocaffeine/battsuspend
             dconf write $batttimeoutid $battsuspendtime
-            echo "Removing temporary file ~/.config/audiocaffeine/battsuspend"
+            # echo "Removing temporary file ~/.config/audiocaffeine/battsuspend"
             rm ~/.config/audiocaffeine/battsuspend
         fi
 
@@ -242,43 +294,43 @@
             # Use pactl to detect if there are any running audio sources.
             if pactl list | grep -q "State: RUNNING"; then
 
-                echo "Audio detected."
+                # echo "Audio detected."
 
                 # If AC timeout was not previously saved, then save it.
                 if [ ! -f ~/.config/audiocaffeine/acsuspend ]; then
-                    echo "Saving current AC suspend timeout."
+                    # echo "Saving current AC suspend timeout."
                     dconf read $actimeoutid > ~/.config/audiocaffeine/acsuspend
                 fi
 
                 # If battery timeout was not previously saved, then save it.
                 if [ ! -f ~/.config/audiocaffeine/battsuspend ]; then
-                    echo "Saving current battery suspend timeout."
+                    # echo "Saving current battery suspend timeout."
                     dconf read $batttimeoutid > ~/.config/audiocaffeine/battsuspend
                 fi
 
                 # Set the suspend timouts to Never using gsettings.
-                echo "Changing suspend timeouts."
+                # echo "Changing suspend timeouts."
                 dconf write $actimeoutid $disablevalue
                 dconf write $batttimeoutid $disablevalue
 
             else
-                echo "No audio detected."
+                # echo "No audio detected."
 
                 # Restore previous value for AC suspend timeout and delete the temporary file storing it.
                 if [ -f ~/.config/audiocaffeine/acsuspend ]; then
-                    echo "Restoring previous AC suspend timeout."
+                    # echo "Restoring previous AC suspend timeout."
                     read acsuspendtime < ~/.config/audiocaffeine/acsuspend
                     dconf write $actimeoutid $acsuspendtime
-                    echo "Removing temporary file ~/.config/audiocaffeine/acsuspend"
+                    # echo "Removing temporary file ~/.config/audiocaffeine/acsuspend"
                     rm ~/.config/audiocaffeine/acsuspend
                 fi
 
                 # Restore previous value for battery suspend timeout and delete the temporary file storing it.
                 if [ -f ~/.config/audiocaffeine/battsuspend ]; then
-                    echo "Restoring previous battery suspend timeout."
+                    # echo "Restoring previous battery suspend timeout."
                     read battsuspendtime < ~/.config/audiocaffeine/battsuspend
                     dconf write $batttimeoutid $battsuspendtime
-                    echo "Removing temporary file ~/.config/audiocaffeine/battsuspend"
+                    # echo "Removing temporary file ~/.config/audiocaffeine/battsuspend"
                     rm ~/.config/audiocaffeine/battsuspend
                 fi
 
@@ -300,37 +352,18 @@
       };
     };
 
-  # This value determines the NixOS release from which the default
-  # settings for stateful data, like file locations and database versions
-  # on your system were taken. It‘s perfectly fine and recommended to leave
-  # this value at the release version of the first install of this system.
-  # Before changing this value read the documentation for this option
-  # (e.g. man configuration.nix or on https://nixos.org/nixos/options.html).
-  system.stateVersion = "24.11"; # Did you read the comment?
+  # Allow unfree packages
+  nixpkgs.config.allowUnfree = true;
 
-  ## Unused:
-
-  # Configure network proxy if necessary
-  # networking.proxy.default = "http://user:password@proxy:port/";
-  # networking.proxy.noProxy = "127.0.0.1,localhost,internal.domain";
-
-  # # Enable the X11 windowing system.
-  # services.xserver.enable = true;
-
-  # # Enable CUPS to print documents.
-  # services.printing.enable = true;
-
-  # # Configure keymap in X11
-  # services.xserver.xkb = {
-  #   layout = "gb";
-  #   variant = "";
-  # };
-
-  # Enable touchpad support (enabled default in most desktopManager).
-  # services.xserver.libinput.enable = true;
-
-  # # Install firefox.
-  # programs.firefox.enable = true;
+  # List packages installed in system profile. To search, run: nix search wget
+  environment.systemPackages = with pkgs; [ # Do not forget to add an editor to edit configuration.nix! The Nano editor is also installed by default.
+    libva-utils
+    docker-compose
+    nvtopPackages.intel
+    nh
+    glxinfo
+    ffmpeg-full
+  ];
 
   # Some programs need SUID wrappers, can be configured further or are
   # started in user sessions.
@@ -340,10 +373,23 @@
   #   enableSSHSupport = true;
   # };
 
+  # List services that you want to enable:
+
+  # Enable the OpenSSH daemon.
+  # services.openssh.enable = true;
 
   # Open ports in the firewall.
   # networking.firewall.allowedTCPPorts = [ ... ];
   # networking.firewall.allowedUDPPorts = [ ... ];
   # Or disable the firewall altogether.
   # networking.firewall.enable = false;
+
+  # This value determines the NixOS release from which the default
+  # settings for stateful data, like file locations and database versions
+  # on your system were taken. It‘s perfectly fine and recommended to leave
+  # this value at the release version of the first install of this system.
+  # Before changing this value read the documentation for this option
+  # (e.g. man configuration.nix or on https://nixos.org/nixos/options.html).
+  system.stateVersion = "24.11"; # Did you read the comment?
+
 }

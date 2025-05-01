@@ -11,7 +11,6 @@
   in
 {
   boot.kernelPackages = pkgs.linuxPackages_6_12;
-  environment.extraInit = "xset s off -dpms";
 
   imports =
     [ # Include the results of the hardware scan.
@@ -140,7 +139,10 @@
     ];
   };
 
-  environment.sessionVariables = { LIBVA_DRIVER_NAME = "iHD";};
+  environment.sessionVariables = {
+    LIBVA_DRIVER_NAME = "iHD";
+    GSK_RENDERER = "gl";
+  };
 
   users.defaultUserShell = pkgs.zsh;
   system.userActivationScripts.zshrc = "touch .zshrc";

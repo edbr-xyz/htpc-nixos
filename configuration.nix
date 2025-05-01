@@ -1,6 +1,6 @@
-# Edit this configuration file to define what should be installed on
-# your system.  Help is available in the configuration.nix(5) man page
-# and in the NixOS manual (accessible by running â€˜nixos-helpâ€™).
+# Edit this configuration file to define what should be installed on your system. 
+# Help is available in the configuration.nix(5) man page and in the NixOS manual
+# (accessible by running "nixos-help").
 
 { config, lib, pkgs, ... }:
   
@@ -10,14 +10,18 @@
     lock-true = { Value = true; Status = "locked"; };
   in
 {
+  # This value determines the NixOS release from which the default
+  # settings for stateful data, like file locations and database versions
+  # on your system were taken. It's perfectly fine and recommended to leave
+  # this value at the release version of the first install of this system.
+  # Before changing this value read the documentation for this option
+  # (e.g. man configuration.nix or on https://nixos.org/nixos/options.html).
+  system.stateVersion = "24.11"; # Did you read the comment?
+
   boot.kernelPackages = pkgs.linuxPackages_6_12;
 
-  imports =
-    [ # Include the results of the hardware scan.
-      ./hardware-configuration.nix
-    ];
+  imports = [ ./hardware-configuration.nix ]; # Include the results of the hardware scan.
 
-  # Bootloader.
   boot.loader = {
     systemd-boot.enable = true;
     efi.canTouchEfiVariables = true;
@@ -28,10 +32,24 @@
     hostName = "edbr-n150"; # Define your hostname.
   };
 
-  # Set your time zone.
+  services.openssh.enable = true;
+
+  services.xserver = {
+    enable = true;
+    displayManager.gdm.enable = true;
+    desktopManager.gnome.enable = true;
+  };
+  
+  environment.gnome.excludePackages = with pkgs; [
+    baobab cheese eog epiphany gedit simple-scan
+    totem yelp evince file-roller geary seahorse
+    gnome-tour gnome-calendar gnome-characters
+    gnome-clocks gnome-contacts gnome-logs gnome-maps
+    gnome-music gnome-photos gnome-weather gnome-connections
+  ];
+
   time.timeZone = "Europe/London";
 
-  # Select internationalisation properties.
   i18n = {
     defaultLocale = "en_GB.UTF-8";
     extraLocaleSettings = {
@@ -47,52 +65,14 @@
     };
   };
 
-  # Enable the X11 windowing system
-  services.xserver.enable = true;
-  services.xserver.displayManager.gdm.enable = true;
-  services.xserver.desktopManager.gnome.enable = true;
-
-  ## Enable SSH
-  services.openssh.enable = true;
-  
-  ## Remove GNOME bloat
-  environment.gnome.excludePackages = with pkgs; [ 
-    baobab      # disk usage analyzer
-    cheese      # photo booth
-    eog         # image viewer
-    epiphany    # web browser
-    gedit       # text editor
-    simple-scan # document scanner
-    totem       # video player
-    yelp        # help viewer
-    evince      # document viewer
-    file-roller # archive manager
-    geary       # email client
-    seahorse    # password manager
-    gnome-tour 
-    gnome-calendar
-    gnome-characters
-    gnome-clocks
-    gnome-contacts
-    gnome-logs
-    gnome-maps
-    gnome-music
-    gnome-photos
-    gnome-weather
-    gnome-connections
-  ];
-
-  # Configure keymap in X11
-  services.xserver.xkb = {
+  services.xserver.xkb = { # Configure keymap in X11
     layout = "gb";
     variant = "";
   };
 
-  # Configure console keymap
-  console.keyMap = "uk";
+  console.keyMap = "uk"; # Configure console keymap
 
-  ## Enable DConf
-  programs.dconf.enable = true;
+  programs.dconf.enable = true; ## Enable DConf
 
   # Enable sound with pipewire.
   hardware.pulseaudio.enable = false;
@@ -102,11 +82,21 @@
     alsa.enable = true;
     alsa.support32Bit = true;
     pulse.enable = true;
-    # If you want to use JACK applications, uncomment this
     jack.enable = true;
   };
 
-  # Define a user account. Don't forget to set a password with â€˜passwdâ€™.
+  nixpkgs.config.allowUnfree = true; # Allow unfree packages
+
+  environment.systemPackages = with pkgs; [ # To search, run: nix search wget
+    libva-utils
+    nvtopPackages.intel
+    nh
+    glxinfo
+    ffmpeg-full
+    gparted
+    lm_sensors
+  ];
+
   users.users.edbr = {
     isNormalUser = true;
     description = "edbr";
@@ -117,20 +107,20 @@
       vlc
       gnome-tweaks
       vscode
-      gparted
-      lm_sensors
     ];
   };
 
-  # Enable automatic login for the user.
   services.displayManager.autoLogin = {
     enable = true;
     user = "edbr";
   };
 
   nixpkgs.config.packageOverrides = pkgs: {
-    intel-vaapi-driver = pkgs.intel-vaapi-driver.override { enableHybridCodec = true; };
+    intel-vaapi-driver = pkgs.intel-vaapi-driver.override {
+      enableHybridCodec = true;
+    };
   };
+
   hardware.graphics = { # hardware.graphics since NixOS 24.11
     enable = true;
     extraPackages = with pkgs; [
@@ -155,7 +145,6 @@
     enableBashCompletion = true;    
     autosuggestions.enable = true;
     syntaxHighlighting.enable = true;
-
     histSize = 10000;
 
     shellAliases = {
@@ -173,10 +162,8 @@
   
   programs.firefox = {
     enable = true;
-
     /* ---- POLICIES ---- */
-    # Check about:policies#documentation for options.
-    policies = {
+    policies = { # Check about:policies#documentation for options.
       SearchEngines = {
         Default = "DuckDuckGo";
         PreventInstalls = true;
@@ -192,13 +179,12 @@
       DisablePocket = true;
       OverrideFirstRunPage = "";
       # OverridePostUpdatePage = "";
-      # DisplayBookmarksToolbar = "never"; # alternatives: "always" or "newtab"
+      DisplayBookmarksToolbar = "never"; # alternatives: "always" or "newtab"
       DisplayMenuBar = "default-off"; # alternatives: "always", "never" or "default-on"
       SearchBar = "unified"; # alternative: "separate"
-
-      /* ---- PREFERENCES ---- */
-      # Check about:config for options.
+      /* ---- about:config ---- */
       Preferences = {
+        "browser.aboutConfig.showWarning" = lock-false;
         "extensions.pocket.enabled" = lock-false;
         "browser.topsites.contile.enabled" = lock-false;
         "browser.newtabpage.activity-stream.feeds.section.topstories" = lock-false;
@@ -210,14 +196,13 @@
         "browser.newtabpage.activity-stream.showSponsored" = lock-false;
         "browser.newtabpage.activity-stream.system.showSponsored" = lock-false;
         "browser.newtabpage.activity-stream.showSponsoredTopSites" = lock-false;
-        
+        "media.videocontrols.picture-in-picture.video-toggle.enabled" = lock-false;
+        # Hardware acceleration:
         "gfx.webrender.all" = lock-true;
         "media.ffmpeg.vaapi.enabled" = lock-true;
-        "media.videocontrols.picture-in-picture.video-toggle.enabled" = lock-false;
         "gfx.webrender.compositor" = lock-true;
         "gfx.webrender.compositor.force-enabled" = lock-true;
-        "browser.aboutConfig.showWarning" = lock-false;
-        "layout.frame_rate" = 58;
+        "layout.frame_rate" = 58; # fixes youtube dropped frames that appear even when hardware accelerated
       };
     };
   };
@@ -336,24 +321,4 @@
         Restart = "always";
       };
     };
-
-  # Allow unfree packages
-  nixpkgs.config.allowUnfree = true;
-
-  # List packages installed in system profile. To search, run: nix search wget
-  environment.systemPackages = with pkgs; [ # Do not forget to add an editor to edit configuration.nix! The Nano editor is also installed by default.
-    libva-utils
-    nvtopPackages.intel
-    nh
-    glxinfo
-    ffmpeg-full
-  ];
-
-  # This value determines the NixOS release from which the default
-  # settings for stateful data, like file locations and database versions
-  # on your system were taken. Itâ€˜s perfectly fine and recommended to leave
-  # this value at the release version of the first install of this system.
-  # Before changing this value read the documentation for this option
-  # (e.g. man configuration.nix or on https://nixos.org/nixos/options.html).
-  system.stateVersion = "24.11"; # Did you read the comment?
 }

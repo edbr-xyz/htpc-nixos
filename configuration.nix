@@ -1,6 +1,6 @@
 # Edit this configuration file to define what should be installed on
 # your system.  Help is available in the configuration.nix(5) man page
-# and in the NixOS manual (accessible by running ‘nixos-help’).
+# and in the NixOS manual (accessible by running â€˜nixos-helpâ€™).
 
 { config, lib, pkgs, ... }:
   
@@ -8,11 +8,10 @@
   let
     lock-false = { Value = false; Status = "locked"; };
     lock-true = { Value = true; Status = "locked"; };
-
-    unstable = import <nixos-unstable> { config = { allowUnfree = true; }; };
   in
 {
-  boot.kernelPackages = pkgs.linuxPackages_6_14;
+  boot.kernelPackages = pkgs.linuxPackages_6_12;
+  environment.extraInit = "xset s off -dpms";
 
   imports =
     [ # Include the results of the hardware scan.
@@ -56,16 +55,7 @@
 
   ## Enable SSH
   services.openssh.enable = true;
-
-  ## Enable Docker
-  virtualisation.docker = {
-    enable = true;
-    rootless = {
-      enable = true;
-      setSocketVariable = true;
-    };
-  };
-
+  
   ## Remove GNOME bloat
   environment.gnome.excludePackages = with pkgs; [ 
     baobab      # disk usage analyzer
@@ -105,9 +95,6 @@
   ## Enable DConf
   programs.dconf.enable = true;
 
-  # Enable CUPS to print documents.
-  # services.printing.enable = true;
-
   # Enable sound with pipewire.
   hardware.pulseaudio.enable = false;
   security.rtkit.enable = true;
@@ -118,20 +105,13 @@
     pulse.enable = true;
     # If you want to use JACK applications, uncomment this
     jack.enable = true;
-
-    # use the example session manager (no others are packaged yet so this is enabled by default,
-    # no need to redefine it in your config for now)
-    #media-session.enable = true;
   };
 
-  # Enable touchpad support (enabled default in most desktopManager).
-  # services.xserver.libinput.enable = true;
-
-  # Define a user account. Don't forget to set a password with ‘passwd’.
+  # Define a user account. Don't forget to set a password with â€˜passwdâ€™.
   users.users.edbr = {
     isNormalUser = true;
     description = "edbr";
-    extraGroups = [ "networkmanager" "wheel" "docker" ];
+    extraGroups = [ "networkmanager" "wheel" ];
     packages = with pkgs; [
       spotify
       moonlight-qt
@@ -139,7 +119,14 @@
       gnome-tweaks
       vscode
       gparted
+      lm_sensors
     ];
+  };
+
+  # Enable automatic login for the user.
+  services.displayManager.autoLogin = {
+    enable = true;
+    user = "edbr";
   };
 
   nixpkgs.config.packageOverrides = pkgs: {
@@ -148,16 +135,12 @@
   hardware.graphics = { # hardware.graphics since NixOS 24.11
     enable = true;
     extraPackages = with pkgs; [
-      unstable.intel-media-driver # LIBVA_DRIVER_NAME=iHD
-      unstable.intel-vaapi-driver # LIBVA_DRIVER_NAME=i965 (older but works better for Firefox/Chromium)pu-rt
+      intel-media-driver # LIBVA_DRIVER_NAME=iHD
+      intel-vaapi-driver # LIBVA_DRIVER_NAME=i965 (older but works better for Firefox/Chromium)
     ];
   };
 
-  environment.sessionVariables = { 
-    LIBVA_DRIVER_NAME = "iHD";
-    MESA_LOADER_DRIVER_OVERRIDE = "iHD";
-    MOZ_ENABLE_WAYLAND = "1";
-  };
+  environment.sessionVariables = { LIBVA_DRIVER_NAME = "iHD";};
 
   users.defaultUserShell = pkgs.zsh;
   system.userActivationScripts.zshrc = "touch .zshrc";
@@ -229,10 +212,10 @@
         "gfx.webrender.all" = lock-true;
         "media.ffmpeg.vaapi.enabled" = lock-true;
         "media.videocontrols.picture-in-picture.video-toggle.enabled" = lock-false;
-        "layout.frame_rate" = 1; # vsync issue
         "gfx.webrender.compositor" = lock-true;
         "gfx.webrender.compositor.force-enabled" = lock-true;
         "browser.aboutConfig.showWarning" = lock-false;
+        "layout.frame_rate" = 58;
       };
     };
   };
@@ -358,38 +341,17 @@
   # List packages installed in system profile. To search, run: nix search wget
   environment.systemPackages = with pkgs; [ # Do not forget to add an editor to edit configuration.nix! The Nano editor is also installed by default.
     libva-utils
-    docker-compose
     nvtopPackages.intel
     nh
     glxinfo
     ffmpeg-full
   ];
 
-  # Some programs need SUID wrappers, can be configured further or are
-  # started in user sessions.
-  # programs.mtr.enable = true;
-  # programs.gnupg.agent = {
-  #   enable = true;
-  #   enableSSHSupport = true;
-  # };
-
-  # List services that you want to enable:
-
-  # Enable the OpenSSH daemon.
-  # services.openssh.enable = true;
-
-  # Open ports in the firewall.
-  # networking.firewall.allowedTCPPorts = [ ... ];
-  # networking.firewall.allowedUDPPorts = [ ... ];
-  # Or disable the firewall altogether.
-  # networking.firewall.enable = false;
-
   # This value determines the NixOS release from which the default
   # settings for stateful data, like file locations and database versions
-  # on your system were taken. It‘s perfectly fine and recommended to leave
+  # on your system were taken. Itâ€˜s perfectly fine and recommended to leave
   # this value at the release version of the first install of this system.
   # Before changing this value read the documentation for this option
   # (e.g. man configuration.nix or on https://nixos.org/nixos/options.html).
   system.stateVersion = "24.11"; # Did you read the comment?
-
 }

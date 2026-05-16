@@ -1,9 +1,10 @@
-# Edit this configuration file to define what should be installed on your system. 
-# Help is available in the configuration.nix(5) man page and in the NixOS manual
-# (accessible by running "nixos-help").
+# Edit this configuration file to define what should be installed on
+# your system.  Help is available in the configuration.nix(5) man page
+# and in the NixOS manual (accessible by running ‘nixos-help’).
 
 { config, lib, pkgs, ... }:
-  
+
+
   ## Firefox config variables
   let
     lock-false = { Value = false; Status = "locked"; };
@@ -12,41 +13,58 @@
 {
   # This value determines the NixOS release from which the default
   # settings for stateful data, like file locations and database versions
-  # on your system were taken. It's perfectly fine and recommended to leave
+  # on your system were taken. It‘s perfectly fine and recommended to leave
   # this value at the release version of the first install of this system.
   # Before changing this value read the documentation for this option
   # (e.g. man configuration.nix or on https://nixos.org/nixos/options.html).
-  system.stateVersion = "24.11"; # Did you read the comment?
-
-  boot.kernelPackages = pkgs.linuxPackages_6_12;
+  system.stateVersion = "25.11"; # Did you read the comment?
 
   imports = [ ./hardware-configuration.nix ]; # Include the results of the hardware scan.
 
-  boot.loader = {
-    systemd-boot.enable = true;
-    efi.canTouchEfiVariables = true;
+  boot = {
+    loader = {
+      systemd-boot.enable = true;
+      efi.canTouchEfiVariables = true;
+    };
+    kernelPackages = pkgs.linuxPackages_6_12;
+  };
+
+  hardware = {
+    graphics = {
+      enable = true;
+      extraPackages = with pkgs; [ intel-media-driver ];
+    };
+    bluetooth.enable = true;
+  };
+
+  nixpkgs.config = {
+    allowUnfree = true;
+    packageOverrides = pkgs: {
+      intel-vaapi-driver = pkgs.intel-vaapi-driver.override {
+        enableHybridCodec = true;
+      };
+    };
+  };
+
+  environment = {
+    sessionVariables = {
+      LIBVA_DRIVER_NAME = "iHD";
+      GSK_RENDERER = "gl";
+    };
+    systemPackages = with pkgs; [ # To search, run: nix search wget
+      libva-utils
+      nvtopPackages.intel
+      ffmpeg-full
+      gparted
+      lm_sensors
+      firefox-devedition
+    ];
   };
 
   networking = {
     networkmanager.enable = true; # Enable networking
-    hostName = "edbr-n150"; # Define your hostname.
+    hostName = "gylly-htpc"; # Define your hostname.
   };
-
-  services.openssh.enable = true;
-
-  services.xserver = {
-    enable = true;
-    displayManager.gdm.enable = true;
-    desktopManager.gnome.enable = true;
-  };
-  
-  environment.gnome.excludePackages = with pkgs; [
-    baobab cheese eog epiphany gedit simple-scan
-    totem yelp evince file-roller geary seahorse
-    gnome-tour gnome-calendar gnome-characters
-    gnome-clocks gnome-contacts gnome-logs gnome-maps
-    gnome-music gnome-photos gnome-weather gnome-connections
-  ];
 
   time.timeZone = "Europe/London";
 
@@ -65,150 +83,130 @@
     };
   };
 
-  services.xserver.xkb = { # Configure keymap in X11
-    layout = "gb";
-    variant = "";
+  services = {
+    openssh.enable = true;
+    desktopManager.plasma6.enable = true;
+    displayManager = {
+      sddm.enable = true;
+      autoLogin = {
+        enable = true;
+        user = "edbr";
+      };
+    };
+    xserver.xkb = { # Configure keymap in X11
+      layout = "gb";
+      variant = "";
+    };
+    pulseaudio.enable = false;
+    pipewire = {
+      enable = true;
+      alsa.enable = true;
+      alsa.support32Bit = true;
+      pulse.enable = true;
+    };
+    glances = { 
+      enable = true;
+      openFirewall = true;
+    };
+    mullvad-vpn = {
+      enable = true;
+      package = pkgs.mullvad-vpn;
+    };
   };
 
-  console.keyMap = "uk"; # Configure console keymap
+  security.rtkit.enable = true; # for pipewire.
 
-  programs.dconf.enable = true; ## Enable DConf
+  console.keyMap = "uk";
 
-  # Enable sound with pipewire.
-  hardware.pulseaudio.enable = false;
-  security.rtkit.enable = true;
-  services.pipewire = {
-    enable = true;
-    alsa.enable = true;
-    alsa.support32Bit = true;
-    pulse.enable = true;
-    jack.enable = true;
-  };
-
-  nixpkgs.config.allowUnfree = true; # Allow unfree packages
-
-  environment.systemPackages = with pkgs; [ # To search, run: nix search wget
-    libva-utils
-    nvtopPackages.intel
-    nh
-    glxinfo
-    ffmpeg-full
-    gparted
-    lm_sensors
-  ];
-
+  # Define a user account. Don't forget to set a password with ‘passwd’.
   users.users.edbr = {
     isNormalUser = true;
-    description = "edbr";
+    description = "Edward Brown";
     extraGroups = [ "networkmanager" "wheel" ];
     packages = with pkgs; [
       spotify
       moonlight-qt
       vlc
-      gnome-tweaks
       vscode
+      figma-linux
+      yt-dlp
+      brave
+      roomeqwizard
     ];
-  };
-
-  services.displayManager.autoLogin = {
-    enable = true;
-    user = "edbr";
-  };
-
-  nixpkgs.config.packageOverrides = pkgs: {
-    intel-vaapi-driver = pkgs.intel-vaapi-driver.override {
-      enableHybridCodec = true;
-    };
-  };
-
-  hardware.graphics = { # hardware.graphics since NixOS 24.11
-    enable = true;
-    extraPackages = with pkgs; [
-      intel-media-driver # LIBVA_DRIVER_NAME=iHD
-      intel-vaapi-driver # LIBVA_DRIVER_NAME=i965 (older but works better for Firefox/Chromium)
-    ];
-  };
-
-  environment.sessionVariables = {
-    LIBVA_DRIVER_NAME = "iHD";
-    GSK_RENDERER = "gl";
   };
 
   users.defaultUserShell = pkgs.zsh;
   system.userActivationScripts.zshrc = "touch .zshrc";
   environment.shells = with pkgs; [ zsh ];
 
-  programs.zsh = {
-    enable = true;
-   
-    enableCompletion = true;
-    enableBashCompletion = true;    
-    autosuggestions.enable = true;
-    syntaxHighlighting.enable = true;
-    histSize = 10000;
-
-    shellAliases = {
-      update = "sudo nixos-rebuild switch";
-    };
-
-    setOptions = [ "AUTO_CD" ];
-
-    ohMyZsh = {
+  programs = {
+    dconf.enable = true;
+    zsh = {
       enable = true;
-      plugins = [ "git" "docker" ];
-      theme = "mh";
+      enableCompletion = true;
+      enableBashCompletion = true;
+      autosuggestions.enable = true;
+      syntaxHighlighting.enable = true;
+      histSize = 10000;
+      shellAliases = { update = "sudo nixos-rebuild switch"; };
+      setOptions = [ "AUTO_CD" ];
+      ohMyZsh = {
+        enable = true;
+        plugins = [ "git" "docker" ];
+        theme = "mh";
+      };
     };
-  };
-  
-  programs.firefox = {
-    enable = true;
-    /* ---- POLICIES ---- */
-    policies = { # Check about:policies#documentation for options.
-      SearchEngines = {
-        Default = "DuckDuckGo";
-        PreventInstalls = true;
-      };
-      DisableTelemetry = true;
-      DisableFirefoxStudies = true;
-      EnableTrackingProtection = {
-        Value= true;
-        Locked = true;
-        Cryptomining = true;
-        Fingerprinting = true;
-      };
-      DisablePocket = true;
-      OverrideFirstRunPage = "";
-      # OverridePostUpdatePage = "";
-      DisplayBookmarksToolbar = "never"; # alternatives: "always" or "newtab"
-      DisplayMenuBar = "default-off"; # alternatives: "always", "never" or "default-on"
-      SearchBar = "unified"; # alternative: "separate"
-      /* ---- about:config ---- */
-      Preferences = {
-        "browser.aboutConfig.showWarning" = lock-false;
-        "extensions.pocket.enabled" = lock-false;
-        "browser.topsites.contile.enabled" = lock-false;
-        "browser.newtabpage.activity-stream.feeds.section.topstories" = lock-false;
-        "browser.newtabpage.activity-stream.feeds.snippets" = lock-false;
-        "browser.newtabpage.activity-stream.section.highlights.includePocket" = lock-false;
-        "browser.newtabpage.activity-stream.section.highlights.includeBookmarks" = lock-false;
-        "browser.newtabpage.activity-stream.section.highlights.includeDownloads" = lock-false;
-        "browser.newtabpage.activity-stream.section.highlights.includeVisited" = lock-false;
-        "browser.newtabpage.activity-stream.showSponsored" = lock-false;
-        "browser.newtabpage.activity-stream.system.showSponsored" = lock-false;
-        "browser.newtabpage.activity-stream.showSponsoredTopSites" = lock-false;
-        "media.videocontrols.picture-in-picture.video-toggle.enabled" = lock-false;
-        # Hardware acceleration:
-        "gfx.webrender.all" = lock-true;
-        "media.ffmpeg.vaapi.enabled" = lock-true;
-        "gfx.webrender.compositor" = lock-true;
-        "gfx.webrender.compositor.force-enabled" = lock-true;
-        "layout.frame_rate" = 58; # fixes youtube dropped frames that appear even when hardware accelerated
+    firefox = {
+      enable = true;
+      # wrapperConfig.pipewireSupport = true;
+      /* ---- POLICIES ---- */
+      policies = { # Check about:policies#documentation for options.
+        SearchEngines = {
+          Default = "DuckDuckGo";
+          PreventInstalls = true;
+        };
+        DisableTelemetry = true;
+        DisableFirefoxStudies = true;
+        EnableTrackingProtection = {
+          Value= true;
+          Locked = true;
+          Cryptomining = true;
+          Fingerprinting = true;
+        };
+        DisablePocket = true;
+        OverrideFirstRunPage = "";
+        # OverridePostUpdatePage = "";
+        DisplayBookmarksToolbar = "never"; # alternatives: "always" or "newtab"
+        DisplayMenuBar = "default-off"; # alternatives: "always", "never" or "default-on"
+        SearchBar = "unified"; # alternative: "separate"
+        /* ---- about:config ---- */
+        Preferences = {
+          "browser.aboutConfig.showWarning" = lock-false;
+          "extensions.pocket.enabled" = lock-false;
+          "browser.topsites.contile.enabled" = lock-false;
+          "browser.newtabpage.activity-stream.feeds.section.topstories" = lock-false;
+          "browser.newtabpage.activity-stream.feeds.snippets" = lock-false;
+          "browser.newtabpage.activity-stream.section.highlights.includePocket" = lock-false;
+          "browser.newtabpage.activity-stream.section.highlights.includeBookmarks" = lock-false;
+          "browser.newtabpage.activity-stream.section.highlights.includeDownloads" = lock-false;
+          "browser.newtabpage.activity-stream.section.highlights.includeVisited" = lock-false;
+          "browser.newtabpage.activity-stream.showSponsored" = lock-false;
+          "browser.newtabpage.activity-stream.system.showSponsored" = lock-false;
+          "browser.newtabpage.activity-stream.showSponsoredTopSites" = lock-false;
+          "media.videocontrols.picture-in-picture.video-toggle.enabled" = lock-false;
+          "xpinstall.signatures.required" = lock-false;
+          # Hardware acceleration:
+          #"gfx.webrender.all" = lock-true;
+          "media.ffmpeg.vaapi.enabled" = lock-true;
+          #"gfx.webrender.compositor" = lock-true;
+          #"gfx.webrender.compositor.force-enabled" = lock-true;
+          #"layout.frame_rate" = 58; # fixes youtube dropped frames that appear even when hardware accelerated
+        };
       };
     };
   };
 
-  ## Service to keep awake during media playback
-  systemd.services.audiocaffeine =
+  systemd.services.audiocaffeine = ## Service to keep awake during media playback
     let
       audioCaffeineScript = pkgs.writeShellScript "audioCaffeineScript.sh" ''
         #!/bin/sh
